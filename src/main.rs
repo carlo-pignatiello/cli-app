@@ -25,13 +25,11 @@ impl ImageVersion {
             return Err("You need to specify your version in this format: major.minor.patch");
         }
         let tags = ImageVersion::parse_tags(args);
-        Ok(
-            ImageVersion {
-                major: tags[0], 
-                minor: tags[1],
-                patch: tags[2]
-            }
-        )
+        Ok(ImageVersion {
+            major: tags[0],
+            minor: tags[1],
+            patch: tags[2],
+        })
     }
 
     fn parse_tags(args: &String) -> Vec<u8> {
@@ -43,7 +41,7 @@ impl ImageVersion {
     }
 }
 
-impl  ConfigImage {
+impl ConfigImage {
     fn new(args: &[String]) -> ConfigImage {
         let image_name = args[1].clone();
         let images_version = args[2].clone();
@@ -53,7 +51,7 @@ impl  ConfigImage {
             version: match tags {
                 Ok(n) => n,
                 Err(err) => panic!("Error: {:?}", err),
-            }
+            },
         }
-    }  
+    }
 }
