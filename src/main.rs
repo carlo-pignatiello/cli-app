@@ -1,4 +1,8 @@
 use std::env;
+use std::fmt::format;
+use reqwest::Url;
+use serde::Deserialize;
+
 fn main() {
     let args: Vec<String> = env::args().collect();
     let conf = ConfigImage::new(&args);
@@ -47,7 +51,7 @@ impl ConfigImage {
         let images_version = args[2].clone();
         let tags = ImageVersion::new(&images_version);
         ConfigImage {
-            image_name: image_name,
+            image_name,
             version: match tags {
                 Ok(n) => n,
                 Err(err) => panic!("Error: {:?}", err),
@@ -55,3 +59,22 @@ impl ConfigImage {
         }
     }
 }
+// This `derive` requires the `serde` dependency.
+#[derive(Deserialize)]
+struct ImageTagsResponse {
+    name: String,
+    tags: Vec<String>
+}
+/*async fn get_last_image_tags(name: &str) -> Result<ImageVersion, &str> {
+    let mut uri: String = String::from("http://localhost:5000/v2");
+    let path = format!("{}/tags/list", name);
+    uri.push_str(&*path);
+    println!("{}", uri)
+    let body = reqwest::get(uri)
+        .await?
+        .json::<ImageTagsResponse>()
+        .await?;
+    let tags_as_str = body.tags.last().unwrap();
+    let tags = ImageVersion::new(&tags_as_str);
+    tags
+}*/
