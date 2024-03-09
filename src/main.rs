@@ -2,8 +2,8 @@ use std::env;
 
 use serde::{Deserialize, Serialize};
 
-mod docker_api;
 mod config_image;
+mod docker_api;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct ResponseApi {
@@ -18,30 +18,48 @@ async fn main() -> Result<(), reqwest::Error> {
     let user_image_conf = config_image::ConfigImage::new(&args);
     println!(
         "You want to push {:?} with version {}.{}.{}",
-        user_image_conf.image_name, user_image_conf.version.major, user_image_conf.version.minor, user_image_conf.version.patch,
+        user_image_conf.image_name,
+        user_image_conf.version.major,
+        user_image_conf.version.minor,
+        user_image_conf.version.patch,
     );
     let registry_gt = registry_image_gte(&user_image_conf.version, &latest_image_conf.tag);
     match registry_gt {
-        true => println!("I'm sad but a newer or equal version in on the registry ({:#?})", latest_image_conf.tag),
-        false => println!("Yes, your image version ({:#?}) is newer!", user_image_conf.version )
+        true => println!(
+            "I'm sad but a newer or equal version in on the registry ({:#?})",
+            latest_image_conf.tag
+        ),
+        false => println!(
+            "Yes, your image version ({:#?}) is newer!",
+            user_image_conf.version
+        ),
     }
     Ok(())
 }
 
-fn registry_image_gte(input_image: &config_image::ImageVersion, registry_image: &config_image::ImageVersion) -> bool {
+fn registry_image_gte(
+    input_image: &config_image::ImageVersion,
+    registry_image: &config_image::ImageVersion,
+) -> bool {
     if registry_image.major > input_image.major {
         return true;
     }
     if registry_image.major == input_image.major && registry_image.minor > input_image.minor {
         return true;
     }
-    if registry_image.major == input_image.major && registry_image.minor == input_image.minor && registry_image.patch > input_image.patch {
+    if registry_image.major == input_image.major
+        && registry_image.minor == input_image.minor
+        && registry_image.patch > input_image.patch
+    {
         return true;
     }
-    if registry_image.major == input_image.major && registry_image.minor == input_image.minor && registry_image.patch == input_image.patch {
+    if registry_image.major == input_image.major
+        && registry_image.minor == input_image.minor
+        && registry_image.patch == input_image.patch
+    {
         return true;
     }
-    return false;
+    false
 }
 
 #[cfg(test)]
@@ -54,7 +72,10 @@ mod tests {
         let registry_string = String::from("1.1.0");
         let input_image = ImageVersion::new(&input_string);
         let registry_image = ImageVersion::new(&registry_string);
-        assert_eq!(registry_image_gte(&input_image.unwrap(), &registry_image.unwrap()), true);
+        assert!(registry_image_gte(
+            &input_image.unwrap(),
+            &registry_image.unwrap()
+        ));
     }
     #[test]
     fn test_equal_version() {
@@ -62,7 +83,10 @@ mod tests {
         let registry_string = String::from("1.0.0");
         let input_image = ImageVersion::new(&input_string);
         let registry_image = ImageVersion::new(&registry_string);
-        assert_eq!(registry_image_gte(&input_image.unwrap(), &registry_image.unwrap()), true);
+        assert!(registry_image_gte(
+            &input_image.unwrap(),
+            &registry_image.unwrap()
+        ));
     }
 
     #[test]
@@ -71,7 +95,10 @@ mod tests {
         let registry_string = String::from("1.1.0");
         let input_image = ImageVersion::new(&input_string);
         let registry_image = ImageVersion::new(&registry_string);
-        assert_eq!(registry_image_gte(&input_image.unwrap(), &registry_image.unwrap()), false);
+        assert!(!registry_image_gte(
+            &input_image.unwrap(),
+            &registry_image.unwrap()
+        ));
     }
 
     #[test]
@@ -80,7 +107,10 @@ mod tests {
         let registry_string = String::from("1.1.0");
         let input_image = ImageVersion::new(&input_string);
         let registry_image = ImageVersion::new(&registry_string);
-        assert_eq!(registry_image_gte(&input_image.unwrap(), &registry_image.unwrap()), false);
+        assert!(!registry_image_gte(
+            &input_image.unwrap(),
+            &registry_image.unwrap()
+        ),);
     }
 
     #[test]
@@ -89,7 +119,10 @@ mod tests {
         let registry_string = String::from("1.1.3");
         let input_image = ImageVersion::new(&input_string);
         let registry_image = ImageVersion::new(&registry_string);
-        assert_eq!(registry_image_gte(&input_image.unwrap(), &registry_image.unwrap()), true);
+        assert!(!registry_image_gte(
+            &input_image.unwrap(),
+            &registry_image.unwrap()
+        ));
     }
 
     #[test]
@@ -98,7 +131,10 @@ mod tests {
         let registry_string = String::from("2.1.3");
         let input_image = ImageVersion::new(&input_string);
         let registry_image = ImageVersion::new(&registry_string);
-        assert_eq!(registry_image_gte(&input_image.unwrap(), &registry_image.unwrap()), true);
+        assert!(registry_image_gte(
+            &input_image.unwrap(),
+            &registry_image.unwrap()
+        ));
     }
 
     #[test]
@@ -107,7 +143,10 @@ mod tests {
         let registry_string = String::from("2.1.0");
         let input_image = ImageVersion::new(&input_string);
         let registry_image = ImageVersion::new(&registry_string);
-        assert_eq!(registry_image_gte(&input_image.unwrap(), &registry_image.unwrap()), false);
+        assert!(registry_image_gte(
+            &input_image.unwrap(),
+            &registry_image.unwrap()
+        ));
     }
 
     #[test]
@@ -116,7 +155,10 @@ mod tests {
         let registry_string = String::from("1.0.1");
         let input_image = ImageVersion::new(&input_string);
         let registry_image = ImageVersion::new(&registry_string);
-        assert_eq!(registry_image_gte(&input_image.unwrap(), &registry_image.unwrap()), true);
+        assert!(registry_image_gte(
+            &input_image.unwrap(),
+            &registry_image.unwrap()
+        ));
     }
 
     #[test]
@@ -125,7 +167,10 @@ mod tests {
         let registry_string = String::from("1.2.1");
         let input_image = ImageVersion::new(&input_string);
         let registry_image = ImageVersion::new(&registry_string);
-        assert_eq!(registry_image_gte(&input_image.unwrap(), &registry_image.unwrap()), false);
+        assert!(!registry_image_gte(
+            &input_image.unwrap(),
+            &registry_image.unwrap()
+        ));
     }
 
     #[test]
@@ -134,8 +179,9 @@ mod tests {
         let registry_string = String::from("1.2.1");
         let input_image = ImageVersion::new(&input_string);
         let registry_image = ImageVersion::new(&registry_string);
-        assert_eq!(registry_image_gte(&input_image.unwrap(), &registry_image.unwrap()), false);
+        assert!(!registry_image_gte(
+            &input_image.unwrap(),
+            &registry_image.unwrap()
+        ));
     }
 }
-
-
