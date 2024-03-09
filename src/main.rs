@@ -1,80 +1,141 @@
 use std::env;
-use std::fmt::format;
-use reqwest::Url;
-use serde::Deserialize;
 
-fn main() {
-    let args: Vec<String> = env::args().collect();
-    let conf = ConfigImage::new(&args);
-    println!(
-        "You want to process {:?} with version {}.{}.{}",
-        conf.image_name, conf.version.major, conf.version.minor, conf.version.patch,
-    );
-}
-#[derive(Debug)]
-struct ImageVersion {
-    major: u8,
-    minor: u8,
-    patch: u8,
-}
-#[derive(Debug)]
-struct ConfigImage {
-    image_name: String,
-    version: ImageVersion,
-}
+use serde::{Deserialize, Serialize};
 
-impl ImageVersion {
-    fn new(args: &String) -> Result<ImageVersion, &str> {
-        if args.chars().count() != 5 {
-            return Err("You need to specify your version in this format: major.minor.patch");
-        }
-        let tags = ImageVersion::parse_tags(args);
-        Ok(ImageVersion {
-            major: tags[0],
-            minor: tags[1],
-            patch: tags[2],
-        })
-    }
+mod docker_api;
+mod config_image;
 
-    fn parse_tags(args: &String) -> Vec<u8> {
-        let tags = args.split(".");
-        let tags_as_int = tags
-            .filter_map(|s| s.parse::<u8>().ok())
-            .collect::<Vec<_>>();
-        tags_as_int
-    }
-}
-
-impl ConfigImage {
-    fn new(args: &[String]) -> ConfigImage {
-        let image_name = args[1].clone();
-        let images_version = args[2].clone();
-        let tags = ImageVersion::new(&images_version);
-        ConfigImage {
-            image_name,
-            version: match tags {
-                Ok(n) => n,
-                Err(err) => panic!("Error: {:?}", err),
-            },
-        }
-    }
-}
-// This `derive` requires the `serde` dependency.
-#[derive(Deserialize)]
-struct ImageTagsResponse {
+#[derive(Debug, Serialize, Deserialize)]
+struct ResponseApi {
     name: String,
-    tags: Vec<String>
+    tags: Vec<String>,
 }
-/*async fn get_last_image_tags(name: &str) -> Result<ImageVersion, &str> {
-    let mut uri: String = String::from("http://localhost:5000/v2");
-    let path = format!("{}/tags/list", name);
-    uri.push_str(&*path);
-    println!("{}", uri)
-    let body = reqwest::get(uri)
-        .await?
-        .json::<ImageTagsResponse>()
-        .await?;
-    let tags_as_str = body.tags.last().unwrap();
-    let tags = ImageVersion::new(&tags_as_str);
-    tags
-}*/
+
+#[tokio::main]
+async fn main() -> Result<(), reqwest::Error> {
+    let args: Vec<String> = env::args().collect();
+    let latest_image_conf = docker_api::get_tags(args[1].clone()).await?;
+    let user_image_conf = config_image::ConfigImage::new(&args);
+    println!(
+        "You want to push {:?} with version {}.{}.{}",
+        user_image_conf.image_name, user_image_conf.version.major, user_image_conf.version.minor, user_image_conf.version.patch,
+    );
+    let registry_gt = registry_image_gte(&user_image_conf.version, &latest_image_conf.tag);
+    match registry_gt {
+        true => println!("I'm sad but a newer or equal version in on the registry ({:#?})", latest_image_conf.tag),
+        false => println!("Yes, your image version ({:#?}) is newer!", user_image_conf.version )
+    }
+    Ok(())
+}
+
+fn registry_image_gte(input_image: &config_image::ImageVersion, registry_image: &config_image::ImageVersion) -> bool {
+    if registry_image.major > input_image.major {
+        return true;
+    }
+    if registry_image.major == input_image.major && registry_image.minor > input_image.minor {
+        return true;
+    }
+    if registry_image.major == input_image.major && registry_image.minor == input_image.minor && registry_image.patch > input_image.patch {
+        return true;
+    }
+    if registry_image.major == input_image.major && registry_image.minor == input_image.minor && registry_image.patch == input_image.patch {
+        return true;
+    }
+    return false;
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::config_image::ImageVersion;
+    use crate::registry_image_gte;
+    #[test]
+    fn test_one() {
+        let input_string = String::from("1.0.0");
+        let registry_string = String::from("1.1.0");
+        let input_image = ImageVersion::new(&input_string);
+        let registry_image = ImageVersion::new(&registry_string);
+        assert_eq!(registry_image_gte(&input_image.unwrap(), &registry_image.unwrap()), true);
+    }
+    #[test]
+    fn test_equal_version() {
+        let input_string = String::from("1.0.0");
+        let registry_string = String::from("1.0.0");
+        let input_image = ImageVersion::new(&input_string);
+        let registry_image = ImageVersion::new(&registry_string);
+        assert_eq!(registry_image_gte(&input_image.unwrap(), &registry_image.unwrap()), true);
+    }
+
+    #[test]
+    fn test_two() {
+        let input_string = String::from("1.4.0");
+        let registry_string = String::from("1.1.0");
+        let input_image = ImageVersion::new(&input_string);
+        let registry_image = ImageVersion::new(&registry_string);
+        assert_eq!(registry_image_gte(&input_image.unwrap(), &registry_image.unwrap()), false);
+    }
+
+    #[test]
+    fn test_three() {
+        let input_string = String::from("1.1.1");
+        let registry_string = String::from("1.1.0");
+        let input_image = ImageVersion::new(&input_string);
+        let registry_image = ImageVersion::new(&registry_string);
+        assert_eq!(registry_image_gte(&input_image.unwrap(), &registry_image.unwrap()), false);
+    }
+
+    #[test]
+    fn test_four() {
+        let input_string = String::from("1.1.1");
+        let registry_string = String::from("1.1.3");
+        let input_image = ImageVersion::new(&input_string);
+        let registry_image = ImageVersion::new(&registry_string);
+        assert_eq!(registry_image_gte(&input_image.unwrap(), &registry_image.unwrap()), true);
+    }
+
+    #[test]
+    fn test_five() {
+        let input_string = String::from("1.2.1");
+        let registry_string = String::from("2.1.3");
+        let input_image = ImageVersion::new(&input_string);
+        let registry_image = ImageVersion::new(&registry_string);
+        assert_eq!(registry_image_gte(&input_image.unwrap(), &registry_image.unwrap()), true);
+    }
+
+    #[test]
+    fn test_six() {
+        let input_string = String::from("2.1.1");
+        let registry_string = String::from("2.1.0");
+        let input_image = ImageVersion::new(&input_string);
+        let registry_image = ImageVersion::new(&registry_string);
+        assert_eq!(registry_image_gte(&input_image.unwrap(), &registry_image.unwrap()), false);
+    }
+
+    #[test]
+    fn test_seven() {
+        let input_string = String::from("1.0.0");
+        let registry_string = String::from("1.0.1");
+        let input_image = ImageVersion::new(&input_string);
+        let registry_image = ImageVersion::new(&registry_string);
+        assert_eq!(registry_image_gte(&input_image.unwrap(), &registry_image.unwrap()), true);
+    }
+
+    #[test]
+    fn test_eight() {
+        let input_string = String::from("1.2.2");
+        let registry_string = String::from("1.2.1");
+        let input_image = ImageVersion::new(&input_string);
+        let registry_image = ImageVersion::new(&registry_string);
+        assert_eq!(registry_image_gte(&input_image.unwrap(), &registry_image.unwrap()), false);
+    }
+
+    #[test]
+    fn test_nine() {
+        let input_string = String::from("1.2.3");
+        let registry_string = String::from("1.2.1");
+        let input_image = ImageVersion::new(&input_string);
+        let registry_image = ImageVersion::new(&registry_string);
+        assert_eq!(registry_image_gte(&input_image.unwrap(), &registry_image.unwrap()), false);
+    }
+}
+
+
