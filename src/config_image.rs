@@ -6,7 +6,7 @@ pub struct ImageVersion {
 }
 
 impl ImageVersion {
-    pub fn new(args: &String) -> Result<ImageVersion, &str> {
+    pub fn new(args: &str) -> Result<ImageVersion, &str> {
         if args.chars().count() != 5 {
             return Err("You need to specify your version in this format: major.minor.patch");
         }
@@ -18,12 +18,10 @@ impl ImageVersion {
         })
     }
 
-    fn parse_tags(args: &String) -> Vec<u8> {
-        let tags = args.split(".");
-        let tags_as_int = tags
-            .filter_map(|s| s.parse::<u8>().ok())
-            .collect::<Vec<_>>();
-        tags_as_int
+    fn parse_tags(args: &str) -> Vec<u8> {
+        let tags = args.split('.');
+        tags.filter_map(|s| s.parse::<u8>().ok())
+            .collect::<Vec<_>>()
     }
 }
 

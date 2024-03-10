@@ -1,24 +1,18 @@
 use std::env;
-
-use serde::{Deserialize, Serialize};
-
 mod config_image;
 mod docker_api;
 
-#[derive(Debug, Serialize, Deserialize)]
-struct ResponseApi {
-    name: String,
-    tags: Vec<String>,
-}
+use config_image::ConfigImage;
+use config_image::ImageVersion;
 
 #[tokio::main]
 async fn main() -> Result<(), reqwest::Error> {
     let args: Vec<String> = env::args().collect();
     let latest_image_conf = docker_api::get_tags(args[1].clone()).await?;
-    let user_image_conf = config_image::ConfigImage::new(&args);
+    let user_image_conf = ConfigImage::new(&args);
     println!(
         "You want to push {:?} with version {}.{}.{}",
-        user_image_conf.image_name,
+        args[1],
         user_image_conf.version.major,
         user_image_conf.version.minor,
         user_image_conf.version.patch,
@@ -37,10 +31,7 @@ async fn main() -> Result<(), reqwest::Error> {
     Ok(())
 }
 
-fn registry_image_gte(
-    input_image: &config_image::ImageVersion,
-    registry_image: &config_image::ImageVersion,
-) -> bool {
+fn registry_image_gte(input_image: &ImageVersion, registry_image: &ImageVersion) -> bool {
     if registry_image.major > input_image.major {
         return true;
     }
